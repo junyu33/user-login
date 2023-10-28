@@ -22,7 +22,7 @@ def regist():
     return render_template('regist.html')
 
 #获取注册请求及处理
-@app.route('/registuser')
+@app.route('/registuser', methods=['POST'])
 def getRigist():
 #把用户名和密码注册到数据库中
  
@@ -30,8 +30,8 @@ def getRigist():
     db = pymysql.connect(host="localhost", user="root", password="123456", database="TESTDB")
     # 使用cursor()方法获取操作游标 
     cursor = db.cursor()
-    username = request.args.get('user')
-    password = request.args.get('password')
+    username = request.form.get('user')
+    password = request.form.get('password')
     # SQL 插入语句
     sql = "INSERT INTO USER(username,password) VALUES ('%s','%s')" % (username, password)
     try:
@@ -47,20 +47,18 @@ def getRigist():
         # 如果发生错误则回滚
         db.rollback()
         return '注册失败'
-    # 关闭数据库连接
-    db.close()
 
 
 #获取登录参数及处理
-@app.route('/login')
+@app.route('/login', methods=['POST'])
 def getLogin():
 #查询用户名及密码是否匹配及存在
     #连接数据库,此前在数据库中创建数据库TESTDB
     db = pymysql.connect(host="localhost", user="root", password="123456", database="TESTDB")
     # 使用cursor()方法获取操作游标 
     cursor = db.cursor()
-    username = request.args.get('user')
-    password = request.args.get('password')
+    username = request.form.get('user')
+    password = request.form.get('password')
     # SQL 查询语句
     sql = "SELECT * FROM USER WHERE username = '%s' AND password = '%s'" % (username, password)
     try:
@@ -72,8 +70,6 @@ def getLogin():
             return '登录成功'
         else:
             return '用户名或密码不正确'
-        # 提交到数据库执行
-        db.commit()
     except:
         # 如果发生错误则回滚
         traceback.print_exc()
