@@ -1,0 +1,19 @@
+CREATE DATABASE IF NOT EXISTS PROJECT;
+USE PROJECT;
+
+CREATE TABLE IF NOT EXISTS user_salt (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    salt VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_password (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL
+);
+
+ALTER TABLE user_salt ADD UNIQUE (username);
+ALTER TABLE user_password ADD UNIQUE (username);
+ALTER TABLE user_password ADD FOREIGN KEY (username) REFERENCES user_salt(username);
+
