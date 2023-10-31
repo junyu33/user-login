@@ -3,7 +3,7 @@ function register() {
   const password = document.getElementById('password').value;
 
   const encoder = new TextEncoder();
-  const passwordData = encoder.encode(password);
+  const passwordData = encoder.encode(user + '.' + password);
 
   const crypto = window.crypto || window.msCrypto;
   crypto.subtle.digest('SHA-256', passwordData)
@@ -43,7 +43,7 @@ function login() {
   const password = document.getElementById('password').value;
 
   const encoder = new TextEncoder();
-  const passwordData = encoder.encode(password);
+  const passwordData = encoder.encode(user + '.' + password);
 
   const crypto = window.crypto || window.msCrypto;
   crypto.subtle.digest('SHA-256', passwordData)
