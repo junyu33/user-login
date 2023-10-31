@@ -11,8 +11,34 @@ from flask import jsonify
 # password hashing library
 import bcrypt
 import traceback  
+# mail server
+from flask_mail import Mail, Message
+import random
+# config reader
+from decouple import config
 #传递根目录
 app = Flask(__name__)
+
+app.config['MAIL_SERVER'] = 'smtp.zoho.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USERNAME'] = config('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = config('MAIL_PASSWORD')
+
+mail = Mail(app)
+
+
+#默认路径访问登录页面
+@app.route('/')
+def login():
+    return render_template('login.html')
+ 
+#默认路径访问注册页面
+@app.route('/regist')
+def regist():
+    return render_template('regist.html')
+
 
 def regist_sql(cursor, sql, db):
     """
@@ -112,17 +138,88 @@ def login_sql(cursor, sql, db):
     db.close()
     return -1 #unexpected error
 
+def reset_sql(cursor, sql, db):
+    """
+    在数据库中执行给定的SQL语句并提交事务。
+
+    Args:
+        cursor: 数据库游标，用于执行SQL语句。
+        sql (str): 要执行的SQL语句。
+        db: 数据库连接对象，用于提交事务和回滚操作。
+
+    Returns:
+        int: 如果执行成功，则返回0；如果发生异常，则返回-1。
+
+    Raises:
+        Exception: 如果在执行SQL语句期间发生任何异常，将引发异常。
+
+    Note:
+        此函数执行以下操作：
+        1. 使用给定的游标执行提供的SQL语句。
+        2. 如果执行成功，将提交事务。
+        3. 如果发生异常，将打印异常信息并回滚事务。
+        4. 根据执行结果返回0（成功）或-1（异常）。
+
+    Example:
+        cursor = db.cursor()
+        sql = "INSERT INTO users (username, password) VALUES ('john', 'secret')"
+        result = regist_sql(cursor, sql, db)
+        if result == 0:
+            print("SQL执行成功")
+        else:
+            print("SQL执行失败")
+
+    """
+    try:
+        # 执行sql语句
+        cursor.execute(sql)
+        # 提交到数据库执行
+        db.commit()
+        return 0  # success 
+    except:
+        #抛出错误信息
+        traceback.print_exc()
+        # 如果发生错误则回滚
+        db.rollback()
+        return -1 # unexpected error
 
 
-#默认路径访问登录页面
-@app.route('/')
-def login():
-    return render_template('login.html')
- 
-#默认路径访问注册页面
-@app.route('/regist')
-def regist():
-    return render_template('regist.html')
+
+#默认路径访问重置密码页面
+@app.route('/send_verification', methods=['POST'])
+def send_verification():
+    """发送验证码到用户的邮箱。
+
+    从请求中获取用户的邮箱地址，并发送一个随机的6位数验证码到该邮箱。
+    
+    Request JSON:
+        email (str): 用户的邮箱地址。
+
+    Returns:
+        JSON: 包含消息的 JSON 对象，描述是否成功发送验证码。
+    """
+    email = request.json.get('email')
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
+
+    # 生成随机的6位数验证码
+    code = str(random.randint(100000, 999999))
+
+    msg = Message('Your Verification Code', sender=config('MAIL_USERNAME'), recipients=[email])
+    msg.body = f"Your verification code is: {code}"
+    mail.send(msg)
+
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
+    cursor = db.cursor()
+    sql = f"INSERT INTO user_captcha (username, captcha) VALUES ('{email}', '{code}') ON DUPLICATE KEY UPDATE captcha='{code}';"
+    print(sql)
+
+    if reset_sql(cursor, sql, db) == -1:
+        return jsonify({"message": "Unexpected error"}), 500
+    else:
+        return jsonify({"message": "Verification code sent!"}), 200
+
+
 
 #获取注册请求及处理
 @app.route('/registuser', methods=['POST'])
@@ -152,13 +249,14 @@ def getRigist():
             print("注册成功")
     """
     #连接数据库,此前在数据库中创建数据库TESTDB
-    db = pymysql.connect(host="localhost", user="root", password="123456", database="PROJECT")
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
     # 使用cursor()方法获取操作游标 
     cursor = db.cursor()
     data = request.get_json()
     user = data['user']
     hashed_password = data['hashedPassword']
-    print(hashed_password)
+    captcha = data['captcha']
+
 
     """
     这段代码使用了Python的bcrypt库来生成盐（salt）并将哈希密码与盐一起进行哈希处理。
@@ -180,6 +278,14 @@ def getRigist():
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(hashed_password.encode('utf-8'), salt)
 
+    # if captcha is not correct
+    sql = "SELECT * FROM user_captcha WHERE username = '%s' AND captcha = '%s'" % (user, captcha)
+    cursor.execute(sql)
+    results = cursor.fetchall()
+    if len(results) == 0:
+        return jsonify({"message": "Invalid captcha"}), 401
+
+    print("captcha correct")
 
 
     # insert username, salt keypair
@@ -238,7 +344,7 @@ def getLogin():
     """
     这段代码用于建立与数据库的连接并获取数据库游标，以准备执行数据库操作。
 
-    1. `db = pymysql.connect(host="localhost", user="root", password="123456", database="PROJECT")`:
+    1. `db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")`:
         通过使用PyMySQL库建立与数据库的连接，提供了数据库主机、用户名、密码和数据库名称等连接信息。
 
     2. `cursor = db.cursor()`: 使用连接对象创建一个数据库游标。游标是用于执行数据库查询和操作的工具。
@@ -246,7 +352,7 @@ def getLogin():
     3. `data = request.get_json()`: 从请求中获取JSON格式的数据，通常包含用户名和哈希密码。
         这些数据将用于后续的数据库操作。
     """
-    db = pymysql.connect(host="localhost", user="root", password="123456", database="PROJECT")
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
     # 使用cursor()方法获取操作游标 
     cursor = db.cursor()
     data = request.get_json()
@@ -297,8 +403,54 @@ def getLogin():
     elif status == 1:
         return jsonify({'message': 'Authentication failed. Invalid password.'}), 401
     else:
-        return "unexpected error", 401
+        return jsonify({'message': 'unexpected error'}), 401
     
+
+@app.route('/resetpasswd', methods=['POST'])
+def resetpasswd():
+    """
+    重置用户的密码。
+
+    Returns:
+        str: 如果重置成功，返回登录页面的HTML；如果重置失败，返回字符串"fail"。
+
+    Note:
+        此函数执行以下操作：
+        1. 连接到数据库，从数据库中检索用户的盐（salt）。
+        2. 使用输入的哈希密码和盐验证用户的登录信息。
+        3. 如果验证成功，返回消息'Authentication successful'和状态代码200。
+        4. 如果验证失败，返回消息'Authentication failed. Invalid password.'和状态代码401。
+        5. 如果发生意外错误，返回消息'unexpected error'和状态代码401。
+
+    Example:
+        # 使用示例
+        data = request.get_json()
+        username = data['user']
+        hashed_password = data['hashedPassword']
+        response, status_code = getLogin()
+        if status_code == 200:
+            print("认证成功")
+            print(response)
+        elif status_code == 401:
+            print("认证失败")
+            print(response)
+        else:
+            print("发生意外错误")
+            print(response)
+    """
+
+    """
+    这段代码用于建立与数据库的连接并获取数据库游标，以准备执行数据库操作。
+
+    1. `db = pymysql.connect(host="localhost", user="root",
+        password=config("DB_PASSWORD"), database="PROJECT")`:
+        通过使用PyMySQL库建立与数据库的连接，提供了数据库主机、用户名、密码和数据库名称等连接信息。
+    2. `cursor = db.cursor()`: 使用连接对象创建一个数据库游标。游标是用于执行数据库查询和操作的工具。
+    3. `data = request.get_json()`: 从请求中获取JSON格式的数据，通常包含用户名和哈希密码。
+        这些数据将用于后续的数据库操作。
+    """
+
+
  
 #使用__name__ == '__main__'是 Python 的惯用法，确保直接执行此脚本时才
 #启动服务器，若其他程序调用该脚本可能父级程序会启动不同的服务器

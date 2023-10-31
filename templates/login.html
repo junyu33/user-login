@@ -1,4 +1,4 @@
-<!--登录模块--!>
+<!--登录模块-->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -9,9 +9,10 @@
     </head>
     <body>
         <form method="post" action='/login'>
-            <label>用户名：<input type="text" id="user" value=""></label><br>
+            <label>邮箱：<input type="text" id="user" value=""></label><br>
             <label>密码：<input type="password" id="password" value=""></label><br>
             <input type="button" value="登录" onclick="login()">
+            <input type="button" value="注册" onclick="window.location.href='/regist'">
         </form>
     </body>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
