@@ -307,8 +307,9 @@ def getRigist():
     hashed_password = bcrypt.hashpw(hashed_password.encode('utf-8'), salt)
 
     # if captcha is not correct
-    sql = "SELECT * FROM user_captcha WHERE username = '%s' AND captcha = '%s'" % (user, captcha)
-    cursor.execute(sql)
+    sql = "SELECT * FROM user_captcha WHERE username = %s AND captcha = %s"
+    cursor.execute(sql, (user, captcha))
+
     results = cursor.fetchall()
     if len(results) == 0:
         return jsonify({"message": "Invalid captcha"}), 401
@@ -317,16 +318,19 @@ def getRigist():
 
 
     # insert username, salt keypair
-    sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s')" % (user, salt.decode('utf-8'))
-    if regist_sql(cursor, sql, db) == -1:
+    #sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s')" % (user, salt.decode('utf-8'))
+    sql = "INSERT INTO user_salt(username, salt) VALUES (%s, %s)"
+    if cursor.execute(sql, (user, salt.decode('utf-8'))) == -1:
+    #if regist_sql(cursor, sql, db) == -1:
         return jsonify({"message": "user exists"}), 401
     else:
         print("insert salt success")
 
     # SQL 插入语句
-    sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s')" % (user, hashed_password.decode('utf-8'))
-
-    if regist_sql(cursor, sql, db) == 0:
+    #sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s')" % (user, hashed_password.decode('utf-8'))
+    sql = "INSERT INTO user_password(username, hashed_password) VALUES (%s, %s)"
+    if cursor.execute(sql, (user, hashed_password.decode('utf-8'))) == 0:
+    #if regist_sql(cursor, sql, db) == 0:
         return jsonify({"message": "Registration success!"}), 200
     else:
         return jsonify({"message": "user exists"}), 401
@@ -390,8 +394,9 @@ def getLogin():
         return jsonify({"message": "Invalid captcha"}), 401
 
     # retrive salt from database
-    sql = "SELECT salt FROM user_salt WHERE username = '%s'" % (username)
-    cursor.execute(sql)
+    #sql = "SELECT salt FROM user_salt WHERE username = '%s'" % (username)
+    sql = "SELECT salt FROM user_salt WHERE username = %s"
+    cursor.execute(sql, (username))
     results = cursor.fetchall()
     if len(results) == 0:
         return jsonify({"message": "user not exists"}), 401
@@ -405,8 +410,10 @@ def getLogin():
 
 
     # SQL 查询语句
-    sql = "SELECT * FROM user_password WHERE username = '%s' AND hashed_password = '%s'" % (username, hashed_password)
-    status = login_sql(cursor, sql, db)
+    #sql = "SELECT * FROM user_password WHERE username = '%s' AND hashed_password = '%s'" % (username, hashed_password)
+    sql = "SELECT * FROM user_password WHERE username = %s AND hashed_password = %s"
+    status = cursor.execute(sql, (username, hashed_password))
+    # status = login_sql(cursor, sql, db)
     # 关闭数据库连接
     db.close()
 
@@ -491,8 +498,9 @@ def resetpasswd():
     hashed_password = bcrypt.hashpw(hashed_password.encode('utf-8'), salt)
 
     # if captcha is not correct
-    sql = "SELECT * FROM user_captcha WHERE username = '%s' AND captcha = '%s'" % (user, captcha)
-    cursor.execute(sql)
+    #sql = "SELECT * FROM user_captcha WHERE username = '%s' AND captcha = '%s'" % (user, captcha)
+    sql = "SELECT * FROM user_captcha WHERE username = %s AND captcha = %s"
+    cursor.execute(sql, (user, captcha))
     results = cursor.fetchall()
     if len(results) == 0:
         return jsonify({"message": "Invalid captcha"}), 401
@@ -501,22 +509,30 @@ def resetpasswd():
 
 
     # insert username, salt keypair
-    sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s') \
-        ON DUPLICATE KEY UPDATE salt='%s'" % (user, salt.decode('utf-8'), salt.decode('utf-8'))
-    print(sql)
-    if regist_sql(cursor, sql, db) == -1:
+    #sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s') \
+    #    ON DUPLICATE KEY UPDATE salt='%s'" % (user, salt.decode('utf-8'), salt.decode('utf-8'))
+    sql = "INSERT INTO user_salt(username, salt) VALUES (%s, %s) \
+        ON DUPLICATE KEY UPDATE salt=%s"
+    
+    if cursor.execute(sql, (user, salt.decode('utf-8'), salt.decode('utf-8'))) == -1:
         return jsonify({"message": "unknown error"}), 401
     else:
         print("insert salt success")
 
     # SQL 插入语句
-    sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s') \
-        ON DUPLICATE KEY UPDATE hashed_password='%s'" % (user, hashed_password.decode('utf-8'), hashed_password.decode('utf-8'))
+    #sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s') \
+    #    ON DUPLICATE KEY UPDATE hashed_password='%s'" % (user, hashed_password.decode('utf-8'), hashed_password.decode('utf-8'))
+    sql = "INSERT INTO user_password(username, hashed_password) VALUES (%s, %s) \
+        ON DUPLICATE KEY UPDATE hashed_password=%s"
 
-    if regist_sql(cursor, sql, db) == 0:
+    try: 
+        cursor.execute(sql, (user, hashed_password.decode('utf-8'), hashed_password.decode('utf-8')))
+    except Exception as e:
+        print(e)
+        return jsonify({"message": "unknown error"}), 401
+    finally:
+        db.close()
         return jsonify({"message": "Password reset successfully!"}), 200
-    else:
-        return "fail"
 
 
 

@@ -3,6 +3,12 @@ function register() {
   const password = document.getElementById('password').value;
   const captcha = document.getElementById('captcha').value;
 
+  let passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*?[#?!@$%^&*-]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    alert('密码包括大小写字母，数字和特殊字符，8位以上');
+    return;
+  }
+
   const encoder = new TextEncoder();
   const passwordData = encoder.encode(user + '.' + password);
 
@@ -100,6 +106,12 @@ function resetpasswd() {
   const user = document.getElementById('user').value;
   const password = document.getElementById('password').value;
   const captcha = document.getElementById('captcha').value;
+
+  let passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*?[#?!@$%^&*-]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    alert('密码包括大小写字母，数字和特殊字符，8位以上');
+    return;
+  }
 
   const encoder = new TextEncoder();
   const passwordData = encoder.encode(user + '.' + password);
