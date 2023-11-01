@@ -1,0 +1,6 @@
+bcrypt
+flask
+pymysql
+flask-mail
+requests
+python-decouple
