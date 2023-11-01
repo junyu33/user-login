@@ -16,6 +16,8 @@ from flask_mail import Mail, Message
 import random
 # config reader
 from decouple import config
+# captcha renew
+import time
 #传递根目录
 app = Flask(__name__)
 
@@ -38,6 +40,14 @@ def login():
 @app.route('/regist')
 def regist():
     return render_template('regist.html')
+
+@app.route('/forget')
+def forget():
+    return render_template('reset.html')
+
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('favicon.ico')
 
 
 def regist_sql(cursor, sql, db):
@@ -211,8 +221,8 @@ def send_verification():
 
     db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
     cursor = db.cursor()
-    sql = f"INSERT INTO user_captcha (username, captcha) VALUES ('{email}', '{code}') ON DUPLICATE KEY UPDATE captcha='{code}';"
-    print(sql)
+    sql = f"INSERT INTO user_captcha (username, captcha) VALUES ('{email}', '{code}') \
+        ON DUPLICATE KEY UPDATE captcha='{code}';"
 
     if reset_sql(cursor, sql, db) == -1:
         return jsonify({"message": "Unexpected error"}), 500
@@ -248,7 +258,7 @@ def getRigist():
         else:
             print("注册成功")
     """
-    #连接数据库,此前在数据库中创建数据库TESTDB
+    #连接数据库,此前在数据库中创建数据库PROJECT
     db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
     # 使用cursor()方法获取操作游标 
     cursor = db.cursor()
@@ -290,15 +300,13 @@ def getRigist():
 
     # insert username, salt keypair
     sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s')" % (user, salt.decode('utf-8'))
-    print(sql)
     if regist_sql(cursor, sql, db) == -1:
-        return "unexpected error", 401
+        return jsonify({"message": "user exists"}), 401
     else:
         print("insert salt success")
 
     # SQL 插入语句
     sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s')" % (user, hashed_password.decode('utf-8'))
-    print(sql)
 
     if regist_sql(cursor, sql, db) == 0:
         return render_template('login.html')
@@ -365,15 +373,13 @@ def getLogin():
     cursor.execute(sql)
     results = cursor.fetchall()
     if len(results) == 0:
-        return "unexpected error", 401
+        return jsonify({"message": "user not exists"}), 401
     salt = results[0][0]
-    print('salt from login:', salt)
 
 
 
     hashed_password = bcrypt.hashpw(hashed_password.encode('utf-8'), salt.encode('utf-8'))
     hashed_password = hashed_password.decode('utf-8')
-    print(hashed_password)
 
 
 
@@ -449,12 +455,88 @@ def resetpasswd():
     3. `data = request.get_json()`: 从请求中获取JSON格式的数据，通常包含用户名和哈希密码。
         这些数据将用于后续的数据库操作。
     """
+    #连接数据库,此前在数据库中创建数据库PROJECT
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
+    # 使用cursor()方法获取操作游标 
+    cursor = db.cursor()
+    data = request.get_json()
+    user = data['user']
+    hashed_password = data['hashedPassword']
+    captcha = data['captcha']
 
 
+
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(hashed_password.encode('utf-8'), salt)
+
+    # if captcha is not correct
+    sql = "SELECT * FROM user_captcha WHERE username = '%s' AND captcha = '%s'" % (user, captcha)
+    cursor.execute(sql)
+    results = cursor.fetchall()
+    if len(results) == 0:
+        return jsonify({"message": "Invalid captcha"}), 401
+
+    print("captcha correct")
+
+
+    # insert username, salt keypair
+    sql = "INSERT INTO user_salt(username, salt) VALUES ('%s', '%s') \
+        ON DUPLICATE KEY UPDATE salt='%s'" % (user, salt.decode('utf-8'), salt.decode('utf-8'))
+    print(sql)
+    if regist_sql(cursor, sql, db) == -1:
+        return jsonify({"message": "unknown error"}), 401
+    else:
+        print("insert salt success")
+
+    # SQL 插入语句
+    sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s') \
+        ON DUPLICATE KEY UPDATE hashed_password='%s'" % (user, hashed_password.decode('utf-8'), hashed_password.decode('utf-8'))
+
+    if regist_sql(cursor, sql, db) == 0:
+        return jsonify({"message": "Password reset successfully!"}), 200
+    else:
+        return "fail"
+
+
+
+def clear_captcha():
+    """
+    清除验证码表中的所有数据并定时执行清除操作。
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+
+    Note:
+        这段代码通过每隔5分钟清除user_captcha中的内容，达到验证码有效期为5分钟的效果。
+    """
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
+    # 使用cursor()方法获取操作游标
+    cursor = db.cursor()
+    # 循环执行清除操作
+    table_name = 'user_captcha'
+    while True:
+        try:
+            # 每隔5分钟执行一次清除操作
+            time.sleep(300)  # 5分钟等待时间
+
+            # 删除表里的所有数据
+            delete_query = f"DELETE FROM {table_name}"
+            cursor.execute(delete_query)
+            db.commit()
+            print(f"表 {table_name} 已清除")
+
+        except KeyboardInterrupt:
+            # 如果用户按下Ctrl+C，退出循环
+            break
  
 #使用__name__ == '__main__'是 Python 的惯用法，确保直接执行此脚本时才
 #启动服务器，若其他程序调用该脚本可能父级程序会启动不同的服务器
 if __name__ == '__main__':
     app.run(debug=True)
-    
-
+    clear_captcha()

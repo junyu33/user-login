@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS user_captcha (
 );
 
 ALTER TABLE user_salt ADD UNIQUE (username);
+ALTER TABLE user_captcha ADD UNIQUE (username);
 ALTER TABLE user_password ADD UNIQUE (username);
 ALTER TABLE user_password ADD FOREIGN KEY (username) REFERENCES user_salt(username);
 

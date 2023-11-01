@@ -80,7 +80,8 @@ function login() {
       })
       .then(data => {
           // Handle your successful data here, if needed.
-          alert('注册成功');
+          alert('登录成功');
+          window.location.href = 'https://www.example.com/'; 
       })
       .catch(error => {
           // Display the error message as an alert.
@@ -127,7 +128,9 @@ function resetpasswd() {
       })
       .then(data => {
           // Handle your successful data here, if needed.
-          alert('注册成功');
+          alert('重置密码成功');
+          // redirect to login page
+          window.location.href = '/';
       })
       .catch(error => {
           // Display the error message as an alert.
@@ -150,12 +153,22 @@ function sendVerification() {
       },
       body: JSON.stringify({ email: email }),
   })
-  .then(response => response.json())
-  .then(data => {
-      responseMessage.innerText = data.message;
+  .then(response => {
+    // First, check if the response status is not OK (not 2xx).
+    if (!response.ok) {
+        // If not OK, try to parse the JSON.
+        return response.json().then(data => {
+            throw new Error(data.message); // Use the message from the server as the error message.
+        });
+    }
+    return response.json(); // If everything is OK, continue to process the data.
   })
-  .catch((error) => {
-      console.error('Error:', error);
-      responseMessage.innerText = "Error sending verification code.";
+  .then(data => {
+      // Handle your successful data here, if needed.
+      alert('验证码已发送');
+  })
+  .catch(error => {
+      // Display the error message as an alert.
+      alert(error.message);
   });
 }

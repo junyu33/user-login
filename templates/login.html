@@ -5,12 +5,14 @@
         <title>登录</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="css/style.css" rel="stylesheet">
+        <link href="../css/style.css" rel="stylesheet">
+        <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     </head>
     <body>
         <form method="post" action='/login'>
             <label>邮箱：<input type="text" id="user" value=""></label><br>
-            <label>密码：<input type="password" id="password" value=""></label><br>
+            <label>密码：<input type="password" id="password" value=""></label>
+            <a href="/forget">忘记密码</a> <br>
             <input type="button" value="登录" onclick="login()">
             <input type="button" value="注册" onclick="window.location.href='/regist'">
         </form>
