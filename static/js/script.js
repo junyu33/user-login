@@ -34,6 +34,8 @@ function register() {
       .then(data => {
           // Handle your successful data here, if needed.
           alert('注册成功');
+          // redirect to login page
+          window.location.href = '/';
       })
       .catch(error => {
           // Display the error message as an alert.
@@ -49,6 +51,7 @@ function register() {
 function login() {
   const user = document.getElementById('user').value;
   const password = document.getElementById('password').value;
+  const recaptchaResponse = grecaptcha.getResponse();
 
   const encoder = new TextEncoder();
   const passwordData = encoder.encode(user + '.' + password);
@@ -60,7 +63,7 @@ function login() {
         .map(byte => byte.toString(16).padStart(2, '0'))
         .join('');
 
-      const data = { user, hashedPassword }; // Include the user and hashed password
+      const data = { user, hashedPassword, recaptchaResponse }; // Include the user and hashed password
       fetch('/login', {
         method: 'POST',
         headers: {

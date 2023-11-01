@@ -1,23 +1,41 @@
-<!--登录模块-->
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <title>登录</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="../css/style.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
         <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+        <!-- Add Bootstrap CSS -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     </head>
     <body>
-        <form method="post" action='/login'>
-            <label>邮箱：<input type="text" id="user" value=""></label><br>
-            <label>密码：<input type="password" id="password" value=""></label>
-            <a href="/forget">忘记密码</a> <br>
-            <input type="button" value="登录" onclick="login()">
-            <input type="button" value="注册" onclick="window.location.href='/regist'">
-        </form>
+        <div class="container">
+            <form method="post" action="/login">
+                <div class="form-group">
+                    <label for="user">邮箱：</label>
+                    <input type="text" class="form-control" id="user" name="user" value="">
+                </div>
+                <div class="form-group">
+                    <label for="password">密码：</label>
+                    <input type="password" class="form-control" id="password" name="password" value="">
+                </div>
+                <a href="/forget">忘记密码</a><br>
+                <div class="g-recaptcha" data-sitekey="{{ app.config['RECAPTCHA_SITE_KEY'] }}"></div>
+                <button type="button" class="btn btn-primary" onclick="login()">登录</button>
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='/regist'">注册</button>
+            </form>
+        </div>
     </body>
+    <script>
+        function onSubmit(token) {
+          document.getElementById("g-recaptcha-response").value = token;
+        }
+    </script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <!-- Add Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-1.12.4.js" integrity="sha256-Qw82+bXyGq6MydymqBxNPYTaUXXq7c8v3CwiYwLLNXU=" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- recaptcha -->
+    <script src="https://www.recaptcha.net/recaptcha/api.js" async defer></script>
 </html>
-
-

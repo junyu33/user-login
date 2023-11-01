@@ -1,7 +1,7 @@
 #导入数据库模块
 import pymysql
 #导入Flask框架，这个框架可以快捷地实现了一个WSGI应用 
-from flask import Flask
+from flask import Flask, json, send_from_directory
 #默认情况下，flask在程序文件夹中的templates子文件夹中寻找模块
 from flask import render_template
 #导入前台请求的模块
@@ -18,6 +18,10 @@ import random
 from decouple import config
 # captcha renew
 import time
+# multi-threading
+import threading 
+# verify recaptcha
+import requests
 #传递根目录
 app = Flask(__name__)
 
@@ -28,13 +32,16 @@ app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USERNAME'] = config('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = config('MAIL_PASSWORD')
 
+app.config['RECAPTCHA_SITE_KEY'] = config('RECAPTCHA_SITE_KEY')
+app.config['RECAPTCHA_SECRET_KEY'] = config('RECAPTCHA_SECRET_KEY')
+
 mail = Mail(app)
 
 
 #默认路径访问登录页面
 @app.route('/')
 def login():
-    return render_template('login.html')
+    return render_template('login.html', app=app)
  
 #默认路径访问注册页面
 @app.route('/regist')
@@ -44,11 +51,6 @@ def regist():
 @app.route('/forget')
 def forget():
     return render_template('reset.html')
-
-@app.route('/favicon.ico')
-def favicon():
-    return app.send_static_file('favicon.ico')
-
 
 def regist_sql(cursor, sql, db):
     """
@@ -230,6 +232,22 @@ def send_verification():
         return jsonify({"message": "Verification code sent!"}), 200
 
 
+def verify_recaptcha(response):
+    # Set up the reCAPTCHA verification endpoint URL and parameters
+    url = 'https://www.google.com/recaptcha/api/siteverify'
+    data = {
+        'secret': config('RECAPTCHA_SECRET_KEY'),
+        'response': response
+    }
+
+    # Send a POST request to the reCAPTCHA verification endpoint
+    response = requests.post(url, data=data)
+
+    # Parse the JSON response
+    result = response.json()
+
+    # Return the verification result
+    return result
 
 #获取注册请求及处理
 @app.route('/registuser', methods=['POST'])
@@ -309,9 +327,9 @@ def getRigist():
     sql = "INSERT INTO user_password(username, hashed_password) VALUES ('%s', '%s')" % (user, hashed_password.decode('utf-8'))
 
     if regist_sql(cursor, sql, db) == 0:
-        return render_template('login.html')
+        return jsonify({"message": "Registration success!"}), 200
     else:
-        return "fail"
+        return jsonify({"message": "user exists"}), 401
 
 #获取登录参数及处理
 @app.route('/login', methods=['POST'])
@@ -366,7 +384,10 @@ def getLogin():
     data = request.get_json()
     username = data['user']
     hashed_password = data['hashedPassword']
+    recaptcha_response = data['recaptchaResponse']
 
+    if verify_recaptcha(recaptcha_response)['success'] == False:
+        return jsonify({"message": "Invalid captcha"}), 401
 
     # retrive salt from database
     sql = "SELECT salt FROM user_salt WHERE username = '%s'" % (username)
@@ -538,5 +559,8 @@ def clear_captcha():
 #使用__name__ == '__main__'是 Python 的惯用法，确保直接执行此脚本时才
 #启动服务器，若其他程序调用该脚本可能父级程序会启动不同的服务器
 if __name__ == '__main__':
-    app.run(debug=True)
-    clear_captcha()
+    # 创建一个线程来执行clear_captcha函数
+    clear_thread = threading.Thread(target=clear_captcha)
+    clear_thread.start()
+
+    app.run(debug=True, host='0.0.0.0', port=5000)
