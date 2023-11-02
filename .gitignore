@@ -1,3 +1,5 @@
 .env
 nohup.out
-
+*.docx
+realize.md
+*.png

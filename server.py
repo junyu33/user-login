@@ -522,6 +522,12 @@ def resetpasswd():
 
     print("captcha correct")
 
+    # check if user exists
+    sql = "SELECT salt FROM user_salt WHERE username = %s"
+    cursor.execute(sql, (user))
+    results = cursor.fetchall()
+    if len(results) == 0:
+        return jsonify({"message": "user not exists"}), 401
 
     # insert username, salt keypair
     sql = "INSERT INTO user_salt(username, salt) VALUES (%s, %s) \
