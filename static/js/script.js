@@ -42,7 +42,6 @@ function register() {
           alert('注册成功');
           // redirect to login page
           const qrCodeBase64 = data.qrcode;
-          alert(qrCodeBase64)
           // 创建一个新的Image元素
           const image = new Image();
           image.src = qrCodeBase64;

@@ -7,4 +7,3 @@ python-decouple
 pyotp
 qrcode
 pycryptodome
-base64
