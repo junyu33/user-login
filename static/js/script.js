@@ -41,7 +41,14 @@ function register() {
           // Handle your successful data here, if needed.
           alert('注册成功');
           // redirect to login page
-          window.location.href = '/';
+          const qrCodeBase64 = data.qrcode;
+          alert(qrCodeBase64)
+          // 创建一个新的Image元素
+          const image = new Image();
+          image.src = qrCodeBase64;
+      
+          // 将图片添加到页面中某个元素内
+          document.getElementById('qrCodeContainer').appendChild(image);
       })
       .catch(error => {
           // Display the error message as an alert.
@@ -100,6 +107,41 @@ function login() {
     .catch(error => {
       console.error('Error:', error);
     });
+}
+
+function login_otp() {
+  const user = document.getElementById('user').value;
+  const hashedPassword = document.getElementById('password').value;
+  const recaptchaResponse = grecaptcha.getResponse();
+
+  // login directly, no need to hash password
+  const data = { user, hashedPassword, recaptchaResponse }; // Include the user and hashed password
+  fetch('/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  }) 
+  .then(response => {
+    // First, check if the response status is not OK (not 2xx).
+    if (!response.ok) {
+        // If not OK, try to parse the JSON.
+        return response.json().then(data => {
+            throw new Error(data.message); // Use the message from the server as the error message.
+        });
+    }
+    return response.json(); // If everything is OK, continue to process the data.
+  })
+  .then(data => {
+      // Handle your successful data here, if needed.
+      alert('登录成功');
+      window.location.href = 'https://www.example.com/'; 
+  })
+  .catch(error => {
+      // Display the error message as an alert.
+      alert(error.message);
+  });
 }
 
 function resetpasswd() {

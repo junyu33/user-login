@@ -19,7 +19,14 @@ CREATE TABLE IF NOT EXISTS user_captcha (
     captcha VARCHAR(255) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_otp (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    otp VARCHAR(255) NOT NULL
+);
+
 ALTER TABLE user_salt ADD UNIQUE (username);
+ALTER TABLE user_otp ADD UNIQUE (username);
 ALTER TABLE user_captcha ADD UNIQUE (username);
 ALTER TABLE user_password ADD UNIQUE (username);
 ALTER TABLE user_password ADD FOREIGN KEY (username) REFERENCES user_salt(username);

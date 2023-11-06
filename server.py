@@ -22,6 +22,14 @@ import time
 import threading 
 # verify recaptcha
 import requests
+# OTP
+import pyotp, qrcode
+# AES encrypt
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from io import BytesIO
+import base64
+
 #传递根目录
 app = Flask(__name__)
 
@@ -51,6 +59,41 @@ def regist():
 @app.route('/forget')
 def forget():
     return render_template('reset.html')
+
+def aes_encrypt(plaintext):
+    key = config('AES_KEY').encode('utf-8')
+    data_to_encrypt = plaintext.encode('utf-8')
+    assert len(key) == 32, "Key must be 32 bytes for AES-256."
+    cipher = AES.new(key, AES.MODE_ECB)
+    padded_data = pad(data_to_encrypt, AES.block_size)
+    ciphertext = cipher.encrypt(padded_data)
+    encrypted_msg = base64.b64encode(ciphertext)
+    return encrypted_msg.decode('utf-8')
+
+def aes_decrypt(encrypted_msg):
+    key = config('AES_KEY').encode('utf-8')
+    data_to_decrypt = base64.b64decode(encrypted_msg)
+    assert len(key) == 32, "Key must be 32 bytes for AES-256."
+    cipher = AES.new(key, AES.MODE_ECB)
+    decrypted_data = cipher.decrypt(data_to_decrypt)
+    plaintext = decrypted_data.decode('utf-8')
+    return plaintext
+
+def url2qr(url):
+    qr = qrcode.QRCode(
+        version=1,  # 控制二维码的大小，从1到40，1最小为21x21的矩阵
+        error_correction=qrcode.constants.ERROR_CORRECT_L,  # 控制二维码的错误纠正功能。L/M/Q/H分别对应7%/15%/25%/30%的错误恢复能力
+        box_size=10,  # 控制二维码中每个小格子包含的像素数
+        border=4,  # 控制二维码四周留白包含的box数目
+    )
+
+    # 添加URI到二维码实例中
+    qr.add_data(url)
+    qr.make(fit=True)
+
+    # 创建一个二维码图片
+    img = qr.make_image(fill='black', back_color='white')
+    return img
 
 def regist_sql(cursor, sql, db, param1=None, param2=None, param3=None):
     """
@@ -338,6 +381,15 @@ def getRigist():
     print("captcha correct")
 
 
+    # otp generation
+    otp_key = pyotp.random_base32()
+    opt_key_encrypted = aes_encrypt(otp_key)
+
+    sql = "INSERT INTO user_otp(username, otp) VALUES (%s, %s)"
+    if regist_sql(cursor, sql, db, user, opt_key_encrypted) == -1:
+        return jsonify({"message": "unknown error"}), 401
+
+    
     # insert username, salt keypair
     sql = "INSERT INTO user_salt(username, salt) VALUES (%s, %s)"
 
@@ -350,7 +402,13 @@ def getRigist():
     sql = "INSERT INTO user_password(username, hashed_password) VALUES (%s, %s)"
 
     if regist_sql(cursor, sql, db, user, hashed_password.decode('utf-8')) == 0:
-        return jsonify({"message": "Registration success!"}), 200
+        totp_url = pyotp.totp.TOTP(otp_key).provisioning_uri(user, issuer_name="user-login")
+        bytes_io = BytesIO()
+        url2qr(totp_url).save(bytes_io, 'PNG')
+        bytes_io.seek(0)
+        base64_image = base64.b64encode(bytes_io.getvalue()).decode('utf-8')
+
+        return jsonify({"message": "Registration success!", "qrcode": 'data:image/png;base64,' + base64_image}), 200
     else:
         return jsonify({"message": "user exists"}), 401
 
@@ -411,6 +469,21 @@ def getLogin():
 
     if verify_recaptcha(recaptcha_response)['success'] == False:
         return jsonify({"message": "Invalid captcha"}), 401
+
+
+    # OPT condition
+    if len(hashed_password) < 8:
+        sql = "SELECT otp FROM user_otp WHERE username = %s"
+        cursor.execute(sql, (username))
+        results = cursor.fetchall()
+        if len(results) == 0:
+            return jsonify({"message": "user not exists"}), 401
+        otp_key_encrypted = results[0][0]
+        otp_key = aes_decrypt(otp_key_encrypted)[:32]
+        if pyotp.TOTP(otp_key).verify(hashed_password):
+            return jsonify({'message': 'Authentication successful'}), 200
+        else:
+            return jsonify({'message': 'Authentication failed. Invalid OTP.'}), 401
 
     # retrive salt from database
     sql = "SELECT salt FROM user_salt WHERE username = %s"

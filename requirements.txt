@@ -4,3 +4,7 @@ pymysql
 flask-mail
 requests
 python-decouple
+pyotp
+qrcode
+pycryptodome
+base64
