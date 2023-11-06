@@ -16,6 +16,17 @@ mysql -u root -p
 source init.sql
 ```
 
+在项目根目录中创建`.env`文件，并填入以下内容：
+
+```sh
+MAIL_USERNAME=
+MAIL_PASSWORD=
+DB_PASSWORD=
+RECAPTCHA_SITE_KEY=
+RECAPTCHA_SECRET_KEY=
+AES_KEY=
+```
+
 启动项目：
 
 ```sh
