@@ -64,6 +64,7 @@ function login() {
   const user = document.getElementById('user').value;
   const password = document.getElementById('password').value;
   const recaptchaResponse = grecaptcha.getResponse();
+  const otp = document.getElementById('otp').value;
 
   const encoder = new TextEncoder();
   const passwordData = encoder.encode(user + '.' + password);
@@ -75,7 +76,7 @@ function login() {
         .map(byte => byte.toString(16).padStart(2, '0'))
         .join('');
 
-      const data = { user, hashedPassword, recaptchaResponse }; // Include the user and hashed password
+      const data = { user, hashedPassword, recaptchaResponse, otp }; // Include the user and hashed password
       fetch('/login', {
         method: 'POST',
         headers: {
@@ -201,13 +202,15 @@ function resetpasswd() {
 function sendVerification() {
   const email = document.getElementById('user').value;
   const responseMessage = document.getElementById('responseMessage');
+  const recaptchaResponse = grecaptcha.getResponse();
 
+  const data = { email, recaptchaResponse }; // Include the user and hashed password  
   fetch('/send_verification', {
       method: 'POST',
       headers: {
           'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email: email }),
+      body: JSON.stringify(data)
   })
   .then(response => {
     // First, check if the response status is not OK (not 2xx).

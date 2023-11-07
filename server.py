@@ -54,11 +54,11 @@ def login():
 #默认路径访问注册页面
 @app.route('/regist')
 def regist():
-    return render_template('regist.html')
+    return render_template('regist.html', app=app)
 
 @app.route('/forget')
 def forget():
-    return render_template('reset.html')
+    return render_template('reset.html', app=app)
 
 def aes_encrypt(plaintext):
     key = config('AES_KEY').encode('utf-8')
@@ -274,6 +274,14 @@ def send_verification():
     Returns:
         JSON: 包含消息的 JSON 对象，描述是否成功发送验证码。
     """
+
+    data = request.get_json()
+
+    recaptcha_response = data['recaptchaResponse']
+
+    if verify_recaptcha(recaptcha_response)['success'] == False:
+        return jsonify({"message": "Invalid captcha"}), 401
+    
     email = request.json.get('email')
     if not email:
         return jsonify({"message": "Email is required"}), 400
@@ -464,6 +472,7 @@ def getLogin():
     cursor = db.cursor()
     data = request.get_json()
     username = data['user']
+    otp = data['otp']
     hashed_password = data['hashedPassword']
     recaptcha_response = data['recaptchaResponse']
 
@@ -471,19 +480,18 @@ def getLogin():
         return jsonify({"message": "Invalid captcha"}), 401
 
 
-    # OPT condition
-    if len(hashed_password) < 8:
-        sql = "SELECT otp FROM user_otp WHERE username = %s"
-        cursor.execute(sql, (username))
-        results = cursor.fetchall()
-        if len(results) == 0:
-            return jsonify({"message": "user not exists"}), 401
-        otp_key_encrypted = results[0][0]
-        otp_key = aes_decrypt(otp_key_encrypted)[:32]
-        if pyotp.TOTP(otp_key).verify(hashed_password):
-            return jsonify({'message': 'Authentication successful'}), 200
-        else:
-            return jsonify({'message': 'Authentication failed. Invalid OTP.'}), 401
+
+    # OTP condition
+    sql = "SELECT otp FROM user_otp WHERE username = %s"
+    cursor.execute(sql, (username))
+    results = cursor.fetchall()
+    if len(results) == 0:
+        return jsonify({"message": "user not exists"}), 401
+
+    otp_key_encrypted = results[0][0]
+    otp_key = aes_decrypt(otp_key_encrypted)[:32]
+    if not pyotp.TOTP(otp_key).verify(otp):
+        return jsonify({'message': 'Authentication failed. Invalid OTP.'}), 401
 
     # retrive salt from database
     sql = "SELECT salt FROM user_salt WHERE username = %s"
