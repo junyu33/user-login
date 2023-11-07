@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+</head>
+
+<body>
+    <h2>User Profile</h2>
+    <p>Welcome, <span id="username">Loading...</span></p>
+    <button onclick="logout()">Logout</button>
+
+    <script>
+        // 在页面加载时调用loadUserProfile函数，假设这个函数已经在另一个<script>标签中定义了
+        window.addEventListener('DOMContentLoaded', (event) => {
+            loadUserProfile();
+        });
+    </script>
+</body>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+</html>

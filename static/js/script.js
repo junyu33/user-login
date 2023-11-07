@@ -96,8 +96,12 @@ function login() {
       })
       .then(data => {
           // Handle your successful data here, if needed.
+          // access_token
           alert('登录成功');
-          window.location.href = 'https://www.example.com/'; 
+          const token = data.access_token;
+          localStorage.setItem('access_token', token);
+
+          window.location.href = '/user'; 
       })
       .catch(error => {
           // Display the error message as an alert.
@@ -107,41 +111,6 @@ function login() {
     .catch(error => {
       console.error('Error:', error);
     });
-}
-
-function login_otp() {
-  const user = document.getElementById('user').value;
-  const hashedPassword = document.getElementById('password').value;
-  const recaptchaResponse = grecaptcha.getResponse();
-
-  // login directly, no need to hash password
-  const data = { user, hashedPassword, recaptchaResponse }; // Include the user and hashed password
-  fetch('/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  }) 
-  .then(response => {
-    // First, check if the response status is not OK (not 2xx).
-    if (!response.ok) {
-        // If not OK, try to parse the JSON.
-        return response.json().then(data => {
-            throw new Error(data.message); // Use the message from the server as the error message.
-        });
-    }
-    return response.json(); // If everything is OK, continue to process the data.
-  })
-  .then(data => {
-      // Handle your successful data here, if needed.
-      alert('登录成功');
-      window.location.href = 'https://www.example.com/'; 
-  })
-  .catch(error => {
-      // Display the error message as an alert.
-      alert(error.message);
-  });
 }
 
 function resetpasswd() {
@@ -230,4 +199,34 @@ function sendVerification() {
       // Display the error message as an alert.
       alert(error.message);
   });
+}
+
+// 用户页面加载时执行的函数
+function loadUserProfile() {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    fetch('/profile', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.logged_in_as) {
+        document.getElementById('username').textContent = data.logged_in_as;
+      } else {
+        console.error('Could not load user profile');
+      }
+    })
+    .catch(error => console.error('Error:', error));
+  } else {
+    alert('请先登录');
+    window.location.href = '/'; // 如果没有token，重定向到登录页面
+  }
+}
+
+function logout() {
+  localStorage.removeItem('access_token');
+  window.location.href = '/';
 }

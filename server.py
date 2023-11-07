@@ -1,7 +1,7 @@
 #导入数据库模块
 import pymysql
 #导入Flask框架，这个框架可以快捷地实现了一个WSGI应用 
-from flask import Flask, json, send_from_directory
+from flask import Flask, json, send_from_directory, abort
 #默认情况下，flask在程序文件夹中的templates子文件夹中寻找模块
 from flask import render_template
 #导入前台请求的模块
@@ -29,6 +29,11 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from io import BytesIO
 import base64
+# JWT
+from functools import wraps
+from datetime import datetime, timedelta
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import timedelta
 
 #传递根目录
 app = Flask(__name__)
@@ -43,7 +48,12 @@ app.config['MAIL_PASSWORD'] = config('MAIL_PASSWORD')
 app.config['RECAPTCHA_SITE_KEY'] = config('RECAPTCHA_SITE_KEY')
 app.config['RECAPTCHA_SECRET_KEY'] = config('RECAPTCHA_SECRET_KEY')
 
+app.config['JWT_SECRET_KEY'] = base64.b64decode(config('JWT_KEY_BASE64'))  # 用于JWT的密钥
+app.config['JWT_COOKIE_SECURE'] = True
+app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
+
 mail = Mail(app)
+jwt = JWTManager(app)
 
 
 #默认路径访问登录页面
@@ -59,6 +69,18 @@ def regist():
 @app.route('/forget')
 def forget():
     return render_template('reset.html', app=app)
+
+@app.route('/user')
+def index():
+    return render_template('user-page.html', app=app)
+
+
+# 受保护的路由示例
+@app.route('/profile', methods=['GET'])
+@jwt_required()
+def profile():
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
 
 def aes_encrypt(plaintext):
     key = config('AES_KEY').encode('utf-8')
@@ -530,7 +552,8 @@ def getLogin():
     以便客户端了解认证结果并采取适当的操作。
     """
     if status == 0:
-        return jsonify({'message': 'Authentication successful'}), 200 
+        access_token = create_access_token(identity=username, expires_delta=timedelta(hours=1))
+        return jsonify({'message': 'Authentication successful', 'access_token': access_token}), 200
     elif status == 1:
         return jsonify({'message': 'Authentication failed. Invalid password.'}), 401
     else:
