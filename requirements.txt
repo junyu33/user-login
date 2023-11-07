@@ -7,3 +7,4 @@ python-decouple
 pyotp
 qrcode
 pycryptodome
+flask_jwt_extended
