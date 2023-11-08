@@ -32,8 +32,10 @@ import base64
 # JWT
 from functools import wraps
 from datetime import datetime, timedelta
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from datetime import timedelta
+# nonce 
+import uuid
 
 #传递根目录
 app = Flask(__name__)
@@ -55,7 +57,6 @@ app.config['JWT_COOKIE_SAMESITE'] = 'Lax'
 mail = Mail(app)
 jwt = JWTManager(app)
 
-
 #默认路径访问登录页面
 @app.route('/')
 def login():
@@ -75,11 +76,36 @@ def index():
     return render_template('user-page.html', app=app)
 
 
+
 # 受保护的路由示例
 @app.route('/profile', methods=['GET'])
 @jwt_required()
 def profile():
     current_user = get_jwt_identity()
+    current_nonce = get_jwt().get('nonce', None)
+    
+    connection = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
+    cursor = connection.cursor()
+    cursor.execute("SELECT timestamp FROM nonces WHERE username = %s AND nonce = %s", (current_user, current_nonce,))
+    row = cursor.fetchone()
+
+    if row is None:
+        cursor.close()
+        connection.close()
+        return jsonify({"message": "Nonce does not exist"}), 401
+
+    nonce_time = row[0]
+    if (datetime.utcnow() - nonce_time).total_seconds() > 3600:
+        cursor.close()
+        connection.close()
+        return jsonify({"message": "Nonce is expired"}), 401
+
+    # cursor.execute("DELETE FROM nonces WHERE nonce = %s", (current_nonce,))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
     return jsonify(logged_in_as=current_user), 200
 
 def aes_encrypt(plaintext):
@@ -533,8 +559,6 @@ def getLogin():
     # SQL 查询语句
     sql = "SELECT * FROM user_password WHERE username = %s AND hashed_password = %s"
     status = login_sql(cursor, sql, db, username, hashed_password)
-    # 关闭数据库连接
-    db.close()
 
     """
     这段代码用于根据验证的状态返回相应的响应消息和HTTP状态码。
@@ -552,7 +576,12 @@ def getLogin():
     以便客户端了解认证结果并采取适当的操作。
     """
     if status == 0:
-        access_token = create_access_token(identity=username, expires_delta=timedelta(hours=1))
+        nonce = str(uuid.uuid4())
+        sql = "INSERT INTO nonces(username, nonce, timestamp) VALUES (%s, %s, %s)"
+        cursor.execute(sql, (username, nonce, datetime.utcnow()))
+        db.commit()
+        db.close()
+        access_token = create_access_token(identity=username, expires_delta=timedelta(hours=1), additional_claims={'nonce': nonce})
         return jsonify({'message': 'Authentication successful', 'access_token': access_token}), 200
     elif status == 1:
         return jsonify({'message': 'Authentication failed. Invalid password.'}), 401
@@ -651,6 +680,41 @@ def resetpasswd():
     else:
         return jsonify({"message": "unknown error"}), 401
 
+@app.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    从数据库中删除指定的nonce。
+
+    Returns:
+        str: 如果删除成功，返回字符串"success"；如果删除失败，返回字符串"fail"。
+
+    Note:
+        此函数执行以下操作：
+        1. 连接到数据库，从数据库中删除指定的nonce。
+        2. 如果删除成功，返回字符串"success"；如果删除失败，返回字符串"fail"。
+
+    Example:
+        # 使用示例
+        nonce = "1234567890"
+        result = logout(nonce)
+        if result == "success":
+            print("注销成功")
+        else:
+            print("注销失败")
+    """
+    current_user = get_jwt_identity()
+
+    db = pymysql.connect(host="localhost", user="root", password=config("DB_PASSWORD"), database="PROJECT")
+    # 使用cursor()方法获取操作游标 
+    cursor = db.cursor()
+
+    sql = "DELETE FROM nonces WHERE username = %s"
+    cursor.execute(sql, (current_user))
+    db.commit()
+    db.close()
+
+    return jsonify({"message": "Logout successful"}), 200
 
 
 def clear_captcha():
@@ -682,6 +746,10 @@ def clear_captcha():
             # 删除表里的所有数据
             delete_query = f"DELETE FROM {table_name}"
             cursor.execute(delete_query)
+            # 删除超过指定时间的nonce
+            delete_query = f"DELETE FROM nonces WHERE timestamp < NOW() - INTERVAL {config('NONCE_EXPIRE_TIME')} SECOND"
+            cursor.execute(delete_query)
+            # 提交到数据库执行 
             db.commit()
             print(f"表 {table_name} 已清除")
 

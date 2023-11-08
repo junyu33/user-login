@@ -227,6 +227,24 @@ function loadUserProfile() {
 }
 
 function logout() {
-  localStorage.removeItem('access_token');
-  window.location.href = '/';
+  token = localStorage.getItem('access_token');
+  fetch('/logout', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  })
+  .then(response => {
+    if (response.status === 200) {
+      // 后端返回成功响应
+      localStorage.removeItem('access_token');
+      window.location.href = '/';
+    } else {
+      // 处理其他响应，例如失败情况
+      console.log('Logout failed');
+    }
+  })
+  .catch(error => {
+    console.error('Error during logout:', error);
+  });
 }

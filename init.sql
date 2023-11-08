@@ -25,18 +25,14 @@ CREATE TABLE IF NOT EXISTS user_otp (
     otp VARCHAR(255) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS user_sessions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    token VARCHAR(255) NOT NULL,
-    ip VARCHAR(45) NOT NULL, -- IPv6 地址最长为 45 个字符
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_session (username, token, ip)
-);
+CREATE TABLE IF NOT EXISTS nonces (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL,
+  nonce VARCHAR(36) NOT NULL UNIQUE,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 假设 `user_salt` 表已经存在，并且 `username` 是唯一的，您可以设置外键约束
-ALTER TABLE user_sessions ADD FOREIGN KEY (username) REFERENCES user_salt(username);
+CREATE INDEX idx_nonce ON nonces (nonce);
 ALTER TABLE user_salt ADD UNIQUE (username);
 ALTER TABLE user_otp ADD UNIQUE (username);
 ALTER TABLE user_captcha ADD UNIQUE (username);
