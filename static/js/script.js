@@ -216,7 +216,8 @@ function loadUserProfile() {
       if (data.logged_in_as) {
         document.getElementById('username').textContent = data.logged_in_as;
       } else {
-        console.error('Could not load user profile');
+        alert('页面过期，请重新登录');
+        window.location.href = '/'; // 如果没有token，重定向到登录页面
       }
     })
     .catch(error => console.error('Error:', error));
